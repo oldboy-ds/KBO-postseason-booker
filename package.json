@@ -1,0 +1,13 @@
+{
+  "name": "postseason-booker",
+  "version": "1.0.0",
+  "private": true,
+  "description": "가을야구 예매하기 버튼 정시 자동 클릭 (로컬 웹앱)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "playwright": "^1.48.0"
+  }
+}

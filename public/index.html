@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>가을야구 자동 예매</title>
+<style>
+  :root {
+    --bg: #f5f6f8; --card: #ffffff; --text: #1b1f24; --muted: #6b7280; --line: #e3e6ea;
+    --primary: #4f46e5; --primary-text: #fff; --danger: #dc2626; --ok: #16a34a; --warn: #d97706;
+    --mono: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #111317; --card: #1a1d23; --text: #e8eaed; --muted: #9aa0a6; --line: #2c3038;
+            --primary: #818cf8; --primary-text: #0b0b12; --danger: #f87171; --ok: #4ade80; --warn: #fbbf24; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 15px/1.5 "Pretendard", "Malgun Gothic", system-ui, sans-serif; }
+  main { max-width: 760px; margin: 0 auto; padding: 24px 16px 48px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .sub { color: var(--muted); margin: 0 0 20px; font-size: 14px; }
+  section { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 18px; margin-bottom: 14px; }
+  h2 { font-size: 15px; margin: 0 0 12px; display: flex; align-items: center; gap: 8px; }
+  .step { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%;
+          background: var(--primary); color: var(--primary-text); font-size: 12px; font-weight: 700; }
+  label { display: block; font-size: 13px; color: var(--muted); margin: 10px 0 4px; }
+  input, select { width: 100%; padding: 9px 10px; border: 1px solid var(--line); border-radius: 8px;
+                  background: var(--bg); color: var(--text); font: inherit; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; }
+  .row > * { flex: 1 1 160px; }
+  button { padding: 9px 16px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg);
+           color: var(--text); font: inherit; font-weight: 600; cursor: pointer; }
+  button.primary { background: var(--primary); border-color: var(--primary); color: var(--primary-text); }
+  button.danger { background: var(--danger); border-color: var(--danger); color: #fff; }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  .actions { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+  .clock { font-family: var(--mono); font-size: 30px; font-weight: 700; letter-spacing: .5px; }
+  .meta { color: var(--muted); font-size: 13px; }
+  .warn { color: var(--warn); } .err { color: var(--danger); } .ok { color: var(--ok); }
+  .hint { font-size: 13px; color: var(--muted); margin-top: 8px; }
+  .countdown { font-family: var(--mono); font-size: 40px; font-weight: 800; text-align: center; margin: 8px 0 2px; }
+  .phase { text-align: center; color: var(--muted); font-size: 14px; }
+  .result { margin-top: 12px; padding: 12px; border-radius: 8px; border: 1px solid var(--line); display: none; }
+  .result.show { display: block; }
+  .log { font-family: var(--mono); font-size: 12.5px; max-height: 280px; overflow: auto; background: var(--bg);
+         border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; white-space: pre-wrap; word-break: break-all; }
+  .log .success { color: var(--ok); } .log .warn { color: var(--warn); } .log .error { color: var(--danger); }
+  details summary { cursor: pointer; color: var(--muted); font-size: 13px; margin-top: 12px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>⚾ 가을야구 자동 예매</h1>
+  <p class="sub">정해진 시각에 "예매하기" 버튼을 자동으로 클릭합니다. 클릭 이후 단계는 직접 진행하세요.</p>
+
+  <section>
+    <h2>표준시 (KRISS)</h2>
+    <div class="clock" id="clock">--:--:--.---</div>
+    <div class="meta" id="offset">시간 동기화 중…</div>
+    <div class="actions"><button id="btnSync">다시 동기화</button></div>
+  </section>
+
+  <section>
+    <h2><span class="step">1</span>브라우저 열기 · 로그인</h2>
+    <label for="url">예매 페이지 URL</label>
+    <input id="url" value="https://nol.yanolja.com/ticket/genre/sports/postseason">
+    <div class="actions"><button class="primary" id="btnOpen">브라우저 열기</button></div>
+    <div class="hint">처음 한 번은 열린 크롬 창에서 직접 로그인하세요. 로그인 정보는 전용 프로필에 저장되어 다음부터 유지됩니다.
+      (구글 로그인은 자동화 브라우저에서 막힐 수 있으니 카카오·네이버·이메일 로그인을 권장합니다.)</div>
+    <div class="meta" id="browserState" style="margin-top:6px"></div>
+  </section>
+
+  <section>
+    <h2><span class="step">2</span>경기 선택</h2>
+    <div class="actions" style="margin-top:0"><button id="btnGames">경기 불러오기</button></div>
+    <label for="game">경기</label>
+    <select id="game"><option value="">먼저 경기를 불러오세요</option></select>
+  </section>
+
+  <section>
+    <h2><span class="step">3</span>예매 오픈 시각 (한국 시간)</h2>
+    <div class="row">
+      <div><label for="date">날짜</label><input type="date" id="date"></div>
+      <div><label for="time">시각</label><input type="time" id="time" step="1" value="14:00:00"></div>
+    </div>
+    <details>
+      <summary>고급 설정</summary>
+      <div class="row">
+        <div><label for="preClick">클릭 시작 (오픈 몇 ms 전)</label><input type="number" id="preClick" value="1000" min="0" step="100"></div>
+        <div><label for="interval">반복 클릭 간격 (ms)</label><input type="number" id="interval" value="100" min="20" step="10"></div>
+      </div>
+      <div class="row">
+        <div><label for="maxAfter">최대 시도 시간 (오픈 후 ms)</label><input type="number" id="maxAfter" value="10000" min="1000" step="1000"></div>
+        <div><label for="refresh">사전 새로고침 (오픈 몇 초 전, 0=안 함)</label><input type="number" id="refresh" value="60" min="0" step="5"></div>
+      </div>
+    </details>
+  </section>
+
+  <section>
+    <h2><span class="step">4</span>실행</h2>
+    <div class="countdown" id="countdown">--:--:--</div>
+    <div class="phase" id="phase">대기</div>
+    <div class="actions" style="justify-content:center">
+      <button class="primary" id="btnRun">실행</button>
+      <button class="danger" id="btnStop" disabled>중지</button>
+    </div>
+    <div class="result" id="result"></div>
+  </section>
+
+  <section>
+    <h2>로그</h2>
+    <div class="log" id="log"></div>
+  </section>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let offsetMs = 0;
+let status = null;
+const PHASES = {
+  'waiting': '오픈 대기 중', 'waiting-refresh': '사전 새로고침 대기 중', 'refreshing': '새로고침 중',
+  'armed': '버튼 감시 중 · 클릭 대기', 'clicking': '클릭 중!',
+};
+
+async function api(path, body) {
+  const res = await fetch(path, {
+    method: body === undefined ? 'GET' : 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || '요청 실패');
+  return data;
+}
+
+const pad = (n, w = 2) => String(n).padStart(w, '0');
+function kstParts(ms) {
+  const d = new Date(ms + 9 * 3600e3);
+  return `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())}.${pad(d.getUTCMilliseconds(), 3)}`;
+}
+function fmtDuration(ms) {
+  const neg = ms < 0; ms = Math.abs(ms);
+  const h = Math.floor(ms / 3600e3), m = Math.floor(ms % 3600e3 / 60e3), s = Math.floor(ms % 60e3 / 1e3), t = Math.floor(ms % 1e3 / 100);
+  return `${neg ? '+' : ''}${h ? pad(h) + ':' : ''}${pad(m)}:${pad(s)}.${t}`;
+}
+
+// 입력값 저장/복원
+const FIELDS = ['url', 'date', 'time', 'preClick', 'interval', 'maxAfter', 'refresh'];
+function saveInputs() {
+  try { localStorage.setItem('booker', JSON.stringify(Object.fromEntries(FIELDS.map((f) => [f, $(f).value])))); } catch (_) {}
+}
+function loadInputs() {
+  try {
+    const saved = JSON.parse(localStorage.getItem('booker') || '{}');
+    FIELDS.forEach((f) => { if (saved[f]) $(f).value = saved[f]; });
+  } catch (_) {}
+  if (!$('date').value) {
+    const d = new Date(Date.now() + 9 * 3600e3);
+    $('date').value = d.toISOString().slice(0, 10);
+  }
+}
+FIELDS.forEach((f) => $(f).addEventListener('change', saveInputs));
+
+function openAtMs() {
+  if (!$('date').value || !$('time').value) return null;
+  const t = $('time').value.length === 5 ? $('time').value + ':00' : $('time').value;
+  return new Date(`${$('date').value}T${t}+09:00`).getTime();
+}
+
+function renderTime() {
+  const t = status && status.time;
+  if (!t) return;
+  offsetMs = t.offsetMs;
+  const dir = t.offsetMs >= 0 ? '늦음' : '빠름';
+  const bad = Math.abs(t.offsetMs) > 50;
+  $('offset').innerHTML =
+    `PC 시계가 표준시보다 <b class="${bad ? 'warn' : 'ok'}">${Math.abs(t.offsetMs)}ms ${dir}</b> · 왕복 ${t.rttMs}ms · ${t.host}` +
+    (bad ? `<br><span class="warn">⚠ 사이트 버튼이 PC 시계로 활성화되면 그만큼 늦게 열릴 수 있습니다. Windows 시간을 time.kriss.re.kr 로 동기화하세요.</span>` : '');
+}
+
+function render() {
+  if (!status) return;
+  renderTime();
+  $('browserState').textContent = status.browserOpen ? `열림 · ${status.pageUrl || ''}` : '닫힘';
+  const running = !!status.run;
+  $('btnRun').disabled = running;
+  $('btnStop').disabled = !running;
+  $('phase').textContent = running ? PHASES[status.run.phase] || status.run.phase : (status.result ? '종료' : '대기');
+
+  const r = status.result;
+  if (r) {
+    $('result').className = 'result show';
+    $('result').innerHTML = `<b class="${r.success ? 'ok' : 'warn'}">${r.success ? '✅ 성공' : '⏹ 종료'}</b> ${r.message}<br>
+      <span class="meta">${r.atKst} (오픈 대비 ${r.afterOpenMs >= 0 ? '+' : ''}${r.afterOpenMs}ms) · 클릭 ${r.clicks}회</span>`;
+  } else {
+    $('result').className = 'result';
+  }
+
+  const logEl = $('log');
+  const atBottom = logEl.scrollTop + logEl.clientHeight >= logEl.scrollHeight - 10;
+  logEl.innerHTML = status.logs.map((l) =>
+    `<div class="${l.level}">[${l.time.slice(11)}] ${l.msg.replace(/</g, '&lt;')}</div>`).join('');
+  if (atBottom) logEl.scrollTop = logEl.scrollHeight;
+}
+
+function tick() {
+  const now = Date.now() + offsetMs;
+  $('clock').textContent = kstParts(now);
+  const target = status && status.run ? status.run.openAt : openAtMs();
+  $('countdown').textContent = target ? fmtDuration(target - now) : '--:--:--';
+  requestAnimationFrame(tick);
+}
+
+async function poll() {
+  try { status = await api('/api/status'); render(); } catch (_) {}
+  setTimeout(poll, 250);
+}
+
+async function withButton(btn, fn) {
+  btn.disabled = true;
+  try { await fn(); } catch (e) { alert(e.message); } finally { btn.disabled = false; }
+}
+
+$('btnSync').onclick = () => withButton($('btnSync'), () => api('/api/time/sync', {}));
+$('btnOpen').onclick = () => withButton($('btnOpen'), () => api('/api/browser/open', { url: $('url').value.trim() }));
+$('btnGames').onclick = () => withButton($('btnGames'), async () => {
+  const { games } = await api('/api/games', { url: $('url').value.trim() });
+  const sel = $('game');
+  const prev = sel.value || localStorage.getItem('booker.game');
+  sel.innerHTML = games.length ? '' : '<option value="">예매하기 버튼을 찾지 못했습니다</option>';
+  games.forEach((g) => {
+    const o = document.createElement('option');
+    o.value = g.key; o.textContent = g.key;
+    sel.appendChild(o);
+  });
+  if (prev && games.some((g) => g.key === prev)) sel.value = prev;
+});
+$('game').onchange = () => { try { localStorage.setItem('booker.game', $('game').value); } catch (_) {} };
+
+$('btnRun').onclick = () => withButton($('btnRun'), async () => {
+  if (!$('game').value) throw new Error('경기를 선택하세요');
+  const t = $('time').value.length === 5 ? $('time').value + ':00' : $('time').value;
+  if (!$('date').value || !t) throw new Error('오픈 날짜와 시각을 입력하세요');
+  saveInputs();
+  await api('/api/run', {
+    url: $('url').value.trim(),
+    gameKey: $('game').value,
+    openAtKst: `${$('date').value}T${t}`,
+    preClickMs: Number($('preClick').value),
+    intervalMs: Number($('interval').value),
+    maxAfterMs: Number($('maxAfter').value),
+    refreshBeforeSec: Number($('refresh').value),
+  });
+});
+$('btnStop').onclick = () => api('/api/stop', {}).catch((e) => alert(e.message));
+
+loadInputs();
+poll();
+requestAnimationFrame(tick);
+</script>
+</body>
+</html>

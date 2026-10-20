@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>테스트 예매 페이지</title>
+<style>
+  body { font-family: "Malgun Gothic", sans-serif; max-width: 640px; margin: 30px auto; padding: 0 16px; }
+  .card { display: flex; justify-content: space-between; align-items: center; border: 1px solid #ddd; border-radius: 10px; padding: 14px; margin: 10px 0; }
+  button { padding: 8px 18px; border: 1px solid #4f46e5; color: #4f46e5; background: #fff; border-radius: 8px; font-weight: 700; }
+  button.is-off { border-color: #bbb; color: #bbb; }
+  #log { font-family: monospace; font-size: 12px; color: #555; white-space: pre; }
+</style>
+</head>
+<body>
+<h2>테스트 예매 페이지</h2>
+<p>주소 뒤에 <code>?in=초</code> 를 붙이면 페이지를 연 뒤 그 시간이 지나면 4차전 버튼이 활성화됩니다 (기본 20초).
+  버튼 모양은 그대로이고 class 만 바뀌며, 오픈 전에 누르면 알림창이 뜹니다.
+  <code>&amp;mode=disabled</code> 를 붙이면 실제 사이트처럼 disabled 속성으로 잠겨 있다가 풀립니다.</p>
+<div id="list"></div>
+<div id="log"></div>
+<script>
+const games = [
+  ['준플레이오프 3차전', '10월 20일(화) 18:30', 'LG 트윈스 vs KIA 타이거즈'],
+  ['준플레이오프 4차전', '10월 21일(수) 18:30', 'LG 트윈스 vs KIA 타이거즈'],
+  ['준플레이오프 5차전', '10월 23일(금) 18:30', 'KIA 타이거즈 vs LG 트윈스'],
+];
+const params = new URLSearchParams(location.search);
+const sec = Number(params.get('in') || 20);
+const disabledMode = params.get('mode') === 'disabled'; // 실제 사이트처럼 disabled 속성 사용
+const openAt = Date.now() + sec * 1000;
+const log = (m) => { document.getElementById('log').textContent += `${new Date().toISOString()} ${m}\n`; };
+
+games.forEach(([round, date, teams], i) => {
+  const card = document.createElement('div');
+  card.className = 'card';
+  card.innerHTML = `<div><div>${round}</div><b>${date}</b><div>${teams}</div></div>`;
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.textContent = '예매하기';
+  if (i === 1) {
+    if (disabledMode) btn.disabled = true; else btn.className = 'is-off';
+  }
+  btn.onclick = () => {
+    if (btn.classList.contains('is-off')) { log('오픈 전 클릭'); alert('예매 오픈 전입니다.'); return; }
+    log(`클릭 처리 (활성화 후 ${Date.now() - openAt}ms)`);
+    if (disabledMode) {
+      // 실제 사이트처럼 처리 중에는 잠시 disabled
+      btn.disabled = true;
+      setTimeout(() => { btn.disabled = false; window.open('/test-booking.html', 'booking', 'width=900,height=700'); }, 150);
+      return;
+    }
+    window.open('/test-booking.html', 'booking', 'width=900,height=700');
+  };
+  card.appendChild(btn);
+  document.getElementById('list').appendChild(card);
+  if (i === 1) setTimeout(() => {
+    if (disabledMode) btn.disabled = false; else btn.className = '';
+    log('4차전 버튼 활성화');
+  }, sec * 1000);
+});
+</script>
+</body>
+</html>
